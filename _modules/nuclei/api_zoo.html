@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nuclei.api_zoo &mdash; nuclei 0.1.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/index.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> nuclei
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tree/what_is.html">What is NUCLEI?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tree/getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tree/reference.html">Reference</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tree/readme.html">nuclei</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">nuclei</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>nuclei.api_zoo</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for nuclei.api_zoo</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">getpass</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span> <span class="nn">nuclei</span> <span class="kn">import</span> <span class="n">utils</span>
+
+<span class="n">ROUTING</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">app</span><span class="p">:</span> <span class="n">urls</span>
+    <span class="k">for</span> <span class="n">app</span><span class="p">,</span> <span class="n">urls</span> <span class="ow">in</span> <span class="n">utils</span><span class="o">.</span><span class="n">create_routing_table</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">app</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;redis&quot;</span><span class="p">,</span> <span class="s2">&quot;gef-model-legacy&quot;</span><span class="p">]</span>
+<span class="p">}</span>
+<span class="n">INTERNAL</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;PRODUCTION&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+<span class="n">ACCESS_TOKEN</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">MAX_RECURSION_COUNT</span> <span class="o">=</span> <span class="mi">10</span>
+
+
+<span class="k">def</span> <span class="nf">get_url</span><span class="p">(</span><span class="n">app</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get API&#39;s url</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    app : str</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    url : str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">ROUTING</span><span class="p">[</span><span class="n">app</span><span class="p">][</span><span class="n">INTERNAL</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="get_applications"><a class="viewcode-back" href="../../tree/reference.html#nuclei.api_zoo.get_applications">[docs]</a><span class="k">def</span> <span class="nf">get_applications</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get available API&#39;s in the Nuclei landscape.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : list[str]</span>
+<span class="sd">        Names of the API&#39;s</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">ROUTING</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span></div>
+
+
+<span class="nd">@lru_cache</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">get_app_specification</span><span class="p">(</span><span class="n">app</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">get_url</span><span class="p">(</span><span class="n">app</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;openapi.json&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="get_endpoints"><a class="viewcode-back" href="../../tree/reference.html#nuclei.api_zoo.get_endpoints">[docs]</a><span class="k">def</span> <span class="nf">get_endpoints</span><span class="p">(</span><span class="n">app</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get available endpoints of single API.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    app : str</span>
+<span class="sd">        Name of the API.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : list[str]</span>
+<span class="sd">        Endpoint urls.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">get_app_specification</span><span class="p">(</span><span class="n">app</span><span class="p">)[</span><span class="s2">&quot;paths&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span></div>
+
+
+<span class="k">def</span> <span class="nf">get_endpoint_type</span><span class="p">(</span><span class="n">app</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    app</span>
+<span class="sd">        name of the app</span>
+<span class="sd">    endpoint</span>
+<span class="sd">        url of the endpoint.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    &quot;get&quot; | &quot;post&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">get_app_specification</span><span class="p">(</span><span class="n">app</span><span class="p">)[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="n">endpoint</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">resolve_ref</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">ref</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    spec</span>
+<span class="sd">        full openapi spec of the app</span>
+<span class="sd">    ref</span>
+<span class="sd">        reference to look up</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Part of the schema at the ref</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ref</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#/&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid OpenAPI ref </span><span class="si">{</span><span class="n">ref</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># pragma: no cover</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">ref</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">p</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unable to resolve OpenAPI ref </span><span class="si">{</span><span class="n">ref</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># pragma: no cover</span>
+        <span class="n">spec</span> <span class="o">=</span> <span class="n">spec</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">spec</span>
+
+
+<span class="k">def</span> <span class="nf">flatten_schema_parameters</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">schema</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Used to extract request body parameters from an openapi spec.</span>
+<span class="sd">    Handles $ref, allOf, anyOf, and oneOf.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    spec</span>
+<span class="sd">        full openapi spec of the app, used to resolve $ref references</span>
+<span class="sd">    schema</span>
+<span class="sd">        schema part of the spec to flatten</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List of properties of the root object of the schema</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;object&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">schema</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;properties&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="k">if</span> <span class="s2">&quot;$ref&quot;</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">flatten_schema_parameters</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">resolve_ref</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">schema</span><span class="p">[</span><span class="s2">&quot;$ref&quot;</span><span class="p">]))</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;allOf&quot;</span><span class="p">,</span> <span class="s2">&quot;anyOf&quot;</span><span class="p">,</span> <span class="s2">&quot;oneOf&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">flatten_schema_parameters</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">s</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="s2">&quot;type&quot;</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unable to parse OpenAPI spec&quot;</span><span class="p">)</span>  <span class="c1"># pragma: no cover</span>
+
+
+<span class="nd">@lru_cache</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">get_endpoint_parameters</span><span class="p">(</span><span class="n">app</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    app</span>
+<span class="sd">        name of the app</span>
+<span class="sd">    endpoint</span>
+<span class="sd">        url of the endpoint</span>
+<span class="sd">    method</span>
+<span class="sd">        http method of the endpoint.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List of parameter names</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">get_endpoint_type</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="n">app_spec</span> <span class="o">=</span> <span class="n">get_app_specification</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
+    <span class="n">spec</span> <span class="o">=</span> <span class="n">app_spec</span><span class="p">[</span><span class="s2">&quot;paths&quot;</span><span class="p">][</span><span class="n">endpoint</span><span class="p">][</span><span class="n">method</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;get&quot;</span> <span class="ow">or</span> <span class="s2">&quot;parameters&quot;</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">spec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;parameters&quot;</span><span class="p">,</span> <span class="p">[])]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">request_body</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requestBody&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="s2">&quot;$ref&quot;</span> <span class="ow">in</span> <span class="n">request_body</span><span class="p">:</span>
+            <span class="n">request_body</span> <span class="o">=</span> <span class="n">resolve_ref</span><span class="p">(</span><span class="n">app_spec</span><span class="p">,</span> <span class="n">request_body</span><span class="p">[</span><span class="s2">&quot;$ref&quot;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">flatten_schema_parameters</span><span class="p">(</span>
+            <span class="n">app_spec</span><span class="p">,</span>
+            <span class="n">request_body</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;content&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;application/json&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;schema&quot;</span><span class="p">,</span> <span class="p">{}),</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="call_endpoint"><a class="viewcode-back" href="../../tree/reference.html#nuclei.api_zoo.call_endpoint">[docs]</a><span class="k">def</span> <span class="nf">call_endpoint</span><span class="p">(</span>
+    <span class="n">app</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">schema</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+    <span class="n">return_response</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">get_result</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calls an API in the nuclei landscape.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    app : str</span>
+<span class="sd">        Name of the API. call `get_applications` to obtain a list with all applications.</span>
+<span class="sd">    endpoint : str</span>
+<span class="sd">        Name of the API&#39;s endpoint. call `get_endpoints` to obtain a list with all applications for a given API.</span>
+<span class="sd">    schema : dict</span>
+<span class="sd">        The parameter schema for the API. Take a look at the API documentation.</span>
+<span class="sd">    return_response : bool</span>
+<span class="sd">        Return the requests response instead of the parsed data object.</span>
+<span class="sd">    get_result : bool</span>
+<span class="sd">        Automatically call the /get-result/ endpoint if we receive a task in PENDING status.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : dict</span>
+<span class="sd">        Parsed API&#39;s json response.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">validate_or_refresh_token</span><span class="p">(</span><span class="n">ACCESS_TOKEN</span><span class="p">)</span>
+
+    <span class="n">t</span> <span class="o">=</span> <span class="n">get_endpoint_type</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">schema</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">get_result</span>
+        <span class="ow">and</span> <span class="s2">&quot;delay&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">schema</span>
+        <span class="ow">and</span> <span class="s2">&quot;delay&quot;</span> <span class="ow">in</span> <span class="n">get_endpoint_parameters</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+    <span class="p">):</span>
+        <span class="n">schema</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">delay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">schema</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;get&quot;</span><span class="p">:</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">utils</span><span class="o">.</span><span class="n">validify_url</span><span class="p">(</span><span class="n">get_url</span><span class="p">(</span><span class="n">app</span><span class="p">)</span> <span class="o">+</span> <span class="n">endpoint</span><span class="p">),</span>
+            <span class="n">params</span><span class="o">=</span><span class="n">utils</span><span class="o">.</span><span class="n">python_types_to_message</span><span class="p">(</span><span class="n">schema</span><span class="p">),</span>
+            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">ACCESS_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">},</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
+            <span class="n">utils</span><span class="o">.</span><span class="n">validify_url</span><span class="p">(</span><span class="n">get_url</span><span class="p">(</span><span class="n">app</span><span class="p">)</span> <span class="o">+</span> <span class="n">endpoint</span><span class="p">),</span>
+            <span class="n">json</span><span class="o">=</span><span class="n">utils</span><span class="o">.</span><span class="n">python_types_to_message</span><span class="p">(</span><span class="n">schema</span><span class="p">),</span>
+            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">ACCESS_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="n">content_type</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Content-Type&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">get_result</span>
+        <span class="ow">and</span> <span class="n">content_type</span> <span class="o">==</span> <span class="s2">&quot;application/json&quot;</span>
+        <span class="ow">and</span> <span class="s2">&quot;/get-result/&quot;</span> <span class="ow">in</span> <span class="n">get_app_specification</span><span class="p">(</span><span class="n">app</span><span class="p">)[</span><span class="s2">&quot;paths&quot;</span><span class="p">]</span>
+    <span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="s2">&quot;id&quot;</span> <span class="ow">in</span> <span class="n">result</span>
+            <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;state&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;PENDING&quot;</span>
+        <span class="p">):</span>
+            <span class="n">recursion_count</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;recursion_count&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">get_result_schema</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]}</span>
+            <span class="n">timeout</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">2</span> <span class="o">**</span> <span class="n">recursion_count</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;timeout&quot;</span> <span class="ow">in</span> <span class="n">get_endpoint_parameters</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="s2">&quot;/get-result/&quot;</span><span class="p">):</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+                <span class="n">get_result_schema</span><span class="p">[</span><span class="s2">&quot;timeout&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">timeout</span> <span class="o">-</span> <span class="mf">0.5</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">timeout</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">call_endpoint</span><span class="p">(</span>
+                <span class="n">app</span><span class="p">,</span>
+                <span class="s2">&quot;/get-result/&quot;</span><span class="p">,</span>
+                <span class="n">get_result_schema</span><span class="p">,</span>
+                <span class="n">return_response</span><span class="p">,</span>
+                <span class="n">get_result</span><span class="o">=</span><span class="n">recursion_count</span> <span class="o">&lt;</span> <span class="n">MAX_RECURSION_COUNT</span><span class="p">,</span>
+                <span class="n">recursion_count</span><span class="o">=</span><span class="n">recursion_count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">return_response</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">r</span>
+
+    <span class="k">if</span> <span class="n">content_type</span> <span class="o">==</span> <span class="s2">&quot;image/png;base64&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Image</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">text</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">content_type</span> <span class="o">==</span> <span class="s2">&quot;image/png&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Image</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">content_type</span> <span class="o">==</span> <span class="s2">&quot;application/json&quot;</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s2">&quot;msg&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;msg&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;Token has expired&quot;</span><span class="p">:</span>
+                <span class="n">authenticate</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">call_endpoint</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span> <span class="n">schema</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">python_types</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">message_to_python_types</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Nuclei parsing error&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="n">python_types</span>
+    <span class="k">elif</span> <span class="n">content_type</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;text/&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">r</span><span class="o">.</span><span class="n">text</span>
+    <span class="k">return</span> <span class="n">r</span><span class="o">.</span><span class="n">content</span></div>
+
+
+<span class="k">def</span> <span class="nf">authenticate</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">global</span> <span class="n">ACCESS_TOKEN</span>
+    <span class="k">if</span> <span class="n">INTERNAL</span><span class="p">:</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;http://</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;AUTHENTICATON_SERVER_SERVICE_HOST&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;:</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;AUTHENTICATON_SERVER_SERVICE_PORT&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;/get-token&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;NUCLEI_USER&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="ow">and</span> <span class="s2">&quot;NUCLEI_PASSWORD&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+            <span class="n">username</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;NUCLEI_USER&quot;</span><span class="p">]</span>
+            <span class="n">password</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;NUCLEI_PASSWORD&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">username</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;Authentication is needed. What is your nuclei username?&quot;</span><span class="p">)</span>
+            <span class="n">password</span> <span class="o">=</span> <span class="n">getpass</span><span class="o">.</span><span class="n">getpass</span><span class="p">(</span><span class="s2">&quot;What is your password?&quot;</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
+            <span class="s2">&quot;https://crux-nuclei.com/login&quot;</span><span class="p">,</span>
+            <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;username&quot;</span><span class="p">:</span> <span class="n">username</span><span class="p">,</span> <span class="s2">&quot;password&quot;</span><span class="p">:</span> <span class="n">password</span><span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">401</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Unauthorized - incorrect username and/or password&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">r</span><span class="o">.</span><span class="n">status_code</span> <span class="o">!=</span> <span class="mi">200</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot authorize (status </span><span class="si">{</span><span class="n">r</span><span class="o">.</span><span class="n">status_code</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+    <span class="n">ACCESS_TOKEN</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;access_token&quot;</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">validate_or_refresh_token</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validates the type and time-stamp of the JWT-string and refreshes the token if necessary.</span>
+<span class="sd">    Returns an int for testing purposes (1 = token refreshed, 2 = token was valid).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># type is ok, due to short circuiting</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="nb">str</span><span class="p">))</span>
+        <span class="ow">or</span> <span class="p">(</span><span class="s2">&quot;.&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">token</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">utils</span><span class="o">.</span><span class="n">token_time_valid</span><span class="p">(</span><span class="n">token</span><span class="p">))</span>
+    <span class="p">):</span>
+        <span class="n">authenticate</span><span class="p">()</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">2</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, CEMS BV.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
