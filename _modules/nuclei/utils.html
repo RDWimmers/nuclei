@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>nuclei.utils &mdash; nuclei 0.1.0 documentation</title>
+  <title>nuclei.utils &mdash; nuclei 0.1.1 documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/index.css" type="text/css" />
@@ -40,9 +40,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tree/what_is.html">What is NUCLEI?</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tree/getting_started.html">Getting started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tree/reference.html">Reference</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../tree/readme.html">nuclei</a></li>
 </ul>
 
         </div>
@@ -256,10 +253,10 @@
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">use_json</span><span class="p">:</span>
             <span class="c1"># no NaN in array</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
-                <span class="k">return</span> <span class="n">schema</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-            <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">))</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">schema</span><span class="o">.</span><span class="n">flatten</span><span class="p">()):</span>
                 <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">schema</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;NaN&quot;</span><span class="p">,</span> <span class="s2">&quot;null&quot;</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">schema</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">serialize_numpy</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span>
     <span class="c1"># recurse and convert to jsonifyable types</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
@@ -321,7 +318,8 @@
                 <span class="k">return</span> <span class="n">deserialize_pandas_parquet</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">DF</span> <span class="ow">or</span> <span class="n">t</span> <span class="o">==</span> <span class="n">PDS</span><span class="p">:</span>
                 <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                    <span class="s2">&quot;`DataFrame` and `Series` is deprecated and will soon be replaced by `PANDAS_DataFrame` or `PANDAS_Series`.&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;`DataFrame` and `Series` is deprecated and will soon be replaced by `PANDAS_DataFrame` or &quot;</span>
+                    <span class="s2">&quot;`PANDAS_Series`.&quot;</span><span class="p">,</span>
                     <span class="ne">DeprecationWarning</span><span class="p">,</span>
                     <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
                 <span class="p">)</span>
